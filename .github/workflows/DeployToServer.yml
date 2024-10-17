@@ -1,0 +1,49 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Checkout the code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 2. Set up .NET
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'  # Adjust based on the version you're using
+
+    # 3. Restore dependencies
+    - name: Restore dependencies
+      run: dotnet restore
+
+    # 4. Build the project
+    - name: Build the project
+      run: dotnet build --configuration Release --no-restore
+
+    # 5. Publish the app
+    - name: Publish the project
+      run: dotnet publish -c Release -o ./publish
+
+    # 6. Deploy to the server via SSH
+    - name: Copy files to server
+      uses: appleboy/scp-action@v0.1.3
+      with:
+        host: 192.168.3.32    # Your VM's IP address
+        username: Administrator  # Replace with your server's username
+        key: ${{ secrets.SSH_PRIVATE_KEY }}  # Use the SSH private key stored as a GitHub secret
+        source: ./publish/*  # Folder containing your published files
+        target: C:\inetpub\wwwroot # Path on your server to deploy the app (adjust based on your setup)
+
+    # 7. Restart IIS (Optional, if you're hosting with IIS)
+    - name: Restart IIS
+      run: ssh -i ~/.ssh/id_rsa Administrator@192.168.3.32 'iisreset'
+      env:
+        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
